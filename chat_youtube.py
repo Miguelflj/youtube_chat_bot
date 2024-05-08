@@ -13,10 +13,12 @@ import configure
 phone_number = configure.phone_number
 api_key = configure.api_key
 
+print(phone_number)
+print(api_key)
+
 def send_wpp_message(phone_number, api_key,message=None):
     url=f'https://api.callmebot.com/whatsapp.php?phone={phone_number}&text={quote(message)}&apikey={api_key}'
-    requests.get(url)
-    
+    response = requests.get(url)
 
 
 # Define the scopes
@@ -60,7 +62,7 @@ def is_google_form(message):
     return re.search(pattern, message) is not None
 
 
-def list_live_chat_messages(youtube, live_chat_id, phone_number, api_key,page_token=None,):
+def list_live_chat_messages(youtube, live_chat_id, phone_number, api_key,author_search,page_token=None,):
     
     request = youtube.liveChatMessages().list(
         liveChatId=live_chat_id,
@@ -68,15 +70,18 @@ def list_live_chat_messages(youtube, live_chat_id, phone_number, api_key,page_to
         pageToken=page_token
     )
     response = request.execute()
-    messages =  messages = response.get('items', [])
+    messages = response.get('items', [])
 
 
     for item in messages:
         author = item['authorDetails']['displayName']
-        message = item['snippet']['displayMessage']
+        try:
+            message = item['snippet']['displayMessage']
+        except:
+            message=''
         print(f"{author}:{message}")
         
-        if author == 'Miguel Freitas':
+        if author == author_search:
             send_wpp_message(phone_number,api_key,message)
 
         if is_google_form(message):
@@ -87,25 +92,25 @@ def list_live_chat_messages(youtube, live_chat_id, phone_number, api_key,page_to
     return messages, next_page_token
 
 def main(phone_number, api_key):
-    if(len(sys.argv) == 2):
+    if(len(sys.argv) >= 3):
         youtube = get_authenticated_service()
 
         # Replace 'VIDEO_URL' with the YouTube video URL
         video_url = sys.argv[1]
-
+        author_search = sys.argv[2:]
+        author_search = ' '.join(author_search)
         # Extract video ID from URL
         video_id = video_url.split('=')[-1]
-        try:
-            live_chat_id = get_live_chat_id(youtube, video_id)
-            print("Live Chat ID:", live_chat_id)
+       
+        live_chat_id = get_live_chat_id(youtube, video_id)
+        print("Live Chat ID:", live_chat_id)
 
-            # Continuously monitor live chat until the end of the live stream
-            next_page_token = None
-            while True:
-                messages, next_page_token = list_live_chat_messages(youtube, live_chat_id,phone_number, api_key,page_token=next_page_token)
-                time.sleep(5)
-        except:
-            print("Problem with your url live video.")
+        # Continuously monitor live chat until the end of the live stream
+        next_page_token = None
+        while True:
+            messages, next_page_token = list_live_chat_messages(youtube, live_chat_id,phone_number, api_key,author_search,page_token=next_page_token)
+            time.sleep(5)
+   
     else:
         print("Do you need pass url from youtube live with live chat!")
 
